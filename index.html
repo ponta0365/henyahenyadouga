@@ -1,16 +1,31 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
   <meta charset="UTF-8">
-  <title>Firebase コメント表示</title>
-</head>
-<body>
-  <h1>コメント一覧</h1>
-  <div id="comment-list"></div>
-
+  <title>限定動画視聴ページ</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin-top: 50px;
+    }
+    #login, #viewer { display: none; }
+    input[type="password"], input[type="text"] {
+      padding: 8px;
+      font-size: 1em;
+    }
+    button {
+      padding: 8px 16px;
+      font-size: 1em;
+      margin-left: 8px;
+    }
+    #comments { margin-top: 40px; text-align: left; max-width: 600px; margin-left: auto; margin-right: auto; }
+    #comments p { border-bottom: 1px solid #ccc; padding: 5px 0; }
+  </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyC0J5x7akK0Vex8OPaIHKryc2NswnhekSA",
@@ -18,29 +33,92 @@
       projectId: "movie-comment-aaf52",
       storageBucket: "movie-comment-aaf52.appspot.com",
       messagingSenderId: "368444743168",
-      appId: "1:368444743168:web:2641b37c79a7f7683202e5",
-      measurementId: "G-3VCG0P27TG"
+      appId: "1:368444743168:web:2641b37c79a7f7683202e5"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    let username = "匿名ユーザー";
 
     async function loadComments() {
-      try {
-        const querySnapshot = await getDocs(collection(db, "comments"));
-        const container = document.getElementById("comment-list");
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          const p = document.createElement("p");
-          p.textContent = `${data.username}: ${data.comment}`;
-          container.appendChild(p);
-        });
-      } catch (error) {
-        console.error("コメントの取得に失敗:", error);
-      }
+      const querySnapshot = await getDocs(collection(db, "comments"));
+      const commentList = document.getElementById("commentList");
+      commentList.innerHTML = "";
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const p = document.createElement("p");
+        p.textContent = `${data.username || "匿名"}: ${data.comment}`;
+        commentList.appendChild(p);
+      });
     }
 
-    loadComments();
+    async function submitComment() {
+      const commentText = document.getElementById("commentInput").value;
+      if (!commentText) return;
+      await addDoc(collection(db, "comments"), {
+        username: username,
+        comment: commentText,
+        timestamp: serverTimestamp()
+      });
+      document.getElementById("commentInput").value = "";
+      loadComments();
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        username = "user_" + user.uid.substring(0, 6);
+        loadComments();
+      }
+    });
+    signInAnonymously(auth);
+
+    window.submitComment = submitComment;
   </script>
+</head>
+<body>
+
+<h2>🎥 限定動画ページ 🎥</h2>
+
+<div id="login">
+  <p>パスワードを入力してください：</p>
+  <input type="password" id="password">
+  <button onclick="checkPassword()">ログイン</button>
+</div>
+
+<div id="viewer">
+  <h3>限定動画をお楽しみください</h3>
+  <iframe src="https://drive.google.com/file/d/1QLOY-8MyvT7oadCQEJ2T--QBouHk9DNv/preview"
+          width="800" height="450" allow="autoplay"></iframe>
+  <p style="margin-top: 20px;">
+    <a href="https://drive.google.com/drive/folders/1916qD4SN577CZ3fwKvB_jjDLNxbwj0FY?usp=sharing" target="_blank">
+      他の動画フォルダを見る（別ウィンドウで開く）
+    </a>
+  </p>
+
+  <div id="comments">
+    <h3>コメント一覧</h3>
+    <div id="commentList"></div>
+    <input type="text" id="commentInput" placeholder="コメントを入力">
+    <button onclick="submitComment()">送信</button>
+  </div>
+</div>
+
+<script>
+  const correctPassword = "twitchfan";
+  document.getElementById("login").style.display = "block";
+
+  function checkPassword() {
+    const input = document.getElementById("password").value;
+    if (input === correctPassword) {
+      document.getElementById("login").style.display = "none";
+      document.getElementById("viewer").style.display = "block";
+    } else {
+      alert("パスワードが違います。Discordで確認してください。");
+    }
+  }
+</script>
+
 </body>
 </html>
