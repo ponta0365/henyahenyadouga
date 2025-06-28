@@ -1,103 +1,108 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
   <meta charset="UTF-8">
-  <title>限定動画コメント表示</title>
+  <title>限定動画コメントシステム</title>
   <style>
-    body { font-family: sans-serif; background: #000; color: #fff; text-align: center; }
+    body { font-family: sans-serif; text-align: center; }
     #video-container { position: relative; display: inline-block; }
     iframe { width: 800px; height: 450px; border: none; }
     .comment {
       position: absolute;
       color: white;
-      background: rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.6);
       padding: 4px 8px;
-      border-radius: 5px;
-      font-size: 20px;
-      pointer-events: none;
-      white-space: nowrap;
+      border-radius: 4px;
+      font-size: 18px;
+      animation: fadeOut 4s forwards;
     }
-    form { margin-top: 20px; }
-    input, button { padding: 8px; font-size: 1em; }
+    @keyframes fadeOut {
+      0% { opacity: 1; }
+      100% { opacity: 0; }
+    }
   </style>
 </head>
 <body>
-  <h2>🎬 限定動画 + コメント表示 🎬</h2>
-  <div id="video-container">
-    <iframe id="video" src="https://drive.google.com/file/d/1QLOY-8MyvT7oadCQEJ2T--QBouHk9DNv/preview" allow="autoplay"></iframe>
-  </div>
-  <form id="comment-form">
-    <input type="text" id="username" placeholder="名前">
-    <input type="text" id="comment" placeholder="コメント">
-    <button type="submit">投稿</button>
-  </form>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+<h2>🎥 限定動画ページ（擬似同期）</h2>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyC0J5x7akK0Vex8OPaIHKryc2NswnhekSA",
-      authDomain: "movie-comment-aaf52.firebaseapp.com",
-      projectId: "movie-comment-aaf52",
-      storageBucket: "movie-comment-aaf52.appspot.com",
-      messagingSenderId: "368444743168",
-      appId: "1:368444743168:web:2641b37c79a7f7683202e5"
-    };
+<div>
+  <input type="text" id="commentText" placeholder="コメントを入力">
+  <input type="number" id="commentTime" placeholder="表示タイミング(秒)">
+  <button onclick="sendComment()">コメント送信</button>
+</div>
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+<div id="video-container">
+  <iframe id="driveVideo" src="https://drive.google.com/file/d/1QLOY-8MyvT7oadCQEJ2T--QBouHk9DNv/preview" allow="autoplay"></iframe>
+</div>
 
-    const form = document.getElementById("comment-form");
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const username = document.getElementById("username").value;
-      const comment = document.getElementById("comment").value;
-      const timestamp = Math.floor(Date.now() / 1000);
-      await addDoc(collection(db, "comments"), {
-        username,
-        comment,
-        showAt: Math.floor(video.currentTime)  // 再生秒で記録
-      });
-      form.reset();
+<br>
+<button onclick="startSync()">▶ コメント同期スタート</button>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC0J5x7akK0Vex8OPaIHKryc2NswnhekSA",
+    authDomain: "movie-comment-aaf52.firebaseapp.com",
+    projectId: "movie-comment-aaf52",
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  async function sendComment() {
+    const text = document.getElementById("commentText").value;
+    const time = parseFloat(document.getElementById("commentTime").value);
+    if (!text || isNaN(time)) {
+      alert("コメントと秒数を正しく入力してください");
+      return;
+    }
+    await addDoc(collection(db, "comments"), { text, time });
+    alert("送信しました！");
+    document.getElementById("commentText").value = "";
+    document.getElementById("commentTime").value = "";
+  }
+
+  let comments = [];
+  let startTime = null;
+
+  async function startSync() {
+    comments = [];
+    const snap = await getDocs(collection(db, "comments"));
+    snap.forEach(doc => {
+      comments.push(doc.data());
     });
 
-    const video = document.getElementById("video");
+    startTime = Date.now();
+    setInterval(() => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      comments.forEach((c, i) => {
+        if (elapsed >= c.time && !c._shown) {
+          c._shown = true;
+          showComment(c.text);
+        }
+      });
+    }, 500);
+  }
+
+  function showComment(text) {
     const container = document.getElementById("video-container");
+    const div = document.createElement("div");
+    div.className = "comment";
+    div.textContent = text;
 
-    let comments = [];
+    // ランダム位置（動画枠内）
+    const maxX = container.clientWidth - 150;
+    const maxY = container.clientHeight - 40;
+    div.style.left = Math.random() * maxX + "px";
+    div.style.top = Math.random() * maxY + "px";
 
-    async function fetchComments() {
-      const querySnapshot = await getDocs(collection(db, "comments"));
-      comments = [];
-      querySnapshot.forEach((doc) => {
-        comments.push(doc.data());
-      });
-    }
+    container.appendChild(div);
+    setTimeout(() => container.removeChild(div), 4000);
+  }
+</script>
 
-    function showComment(c) {
-      const div = document.createElement("div");
-      div.className = "comment";
-      div.textContent = `${c.username}: ${c.comment}`;
-      div.style.top = Math.random() * 80 + "%";
-      div.style.left = Math.random() * 60 + "%";
-      container.appendChild(div);
-      setTimeout(() => div.remove(), 4000);
-    }
-
-    // 疑似的に時間監視（Drive動画は細かい制御が難しいため）
-    let lastTime = 0;
-    setInterval(async () => {
-      const iframe = document.getElementById("video");
-      const innerDoc = iframe.contentDocument || iframe.contentWindow.document;
-      const time = lastTime + 1;
-      lastTime = time;
-      comments.forEach(c => {
-        if (c.showAt === time) showComment(c);
-      });
-    }, 1000);
-
-    fetchComments();
-  </script>
 </body>
 </html>
