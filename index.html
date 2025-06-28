@@ -1,22 +1,25 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>限定動画コメントシステム</title>
+  <title>🎥 限定動画ページ（同期表示）</title>
   <style>
-    body { font-family: sans-serif; text-align: center; }
-    #video-container { position: relative; display: inline-block; }
-    iframe { width: 800px; height: 450px; border: none; }
+    body { font-family: sans-serif; text-align: center; margin: 40px; }
+    video { width: 80%; max-width: 800px; }
     .comment {
       position: absolute;
       color: white;
-      background: rgba(0,0,0,0.6);
+      background: rgba(0, 0, 0, 0.6);
       padding: 4px 8px;
       border-radius: 4px;
-      font-size: 50px;
-      animation: fadeOut 4s forwards;
+      font-size: 18px;
+      animation: fadeout 4s forwards;
     }
-    @keyframes fadeOut {
+    #video-container {
+      position: relative;
+      display: inline-block;
+    }
+    @keyframes fadeout {
       0% { opacity: 1; }
       100% { opacity: 0; }
     }
@@ -24,83 +27,63 @@
 </head>
 <body>
 
-<h2>🎥 限定動画ページ（擬似同期）</h2>
+<h2>🎥 限定動画ページ（HTML5動画＋同期コメント）</h2>
 
-<div>
-  <input type="text" id="commentText" placeholder="コメントを入力">
-  <input type="number" id="commentTime" placeholder="表示タイミング(秒)">
+<div id="video-container">
+  <video id="video" controls>
+    <source src="your_video.mp4" type="video/mp4">
+    ※お使いのブラウザは video タグに対応していません。
+  </video>
+  <div id="overlay"></div>
+</div>
+
+<div style="margin-top: 20px;">
+  <input type="text" id="commentInput" placeholder="コメントを入力" size="40">
   <button onclick="sendComment()">コメント送信</button>
 </div>
 
-<div id="video-container">
-  <iframe id="driveVideo" src="https://drive.google.com/file/d/1QLOY-8MyvT7oadCQEJ2T--QBouHk9DNv/preview" allow="autoplay"></iframe>
-</div>
+<script>
+  const video = document.getElementById("video");
+  const overlay = document.getElementById("overlay");
+  const commentInput = document.getElementById("commentInput");
 
-<br>
-<button onclick="startSync()">▶ コメント同期スタート</button>
+  // コメントリスト（仮）
+  const comments = []; // { time: 秒数, text: コメント内容 }
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyC0J5x7akK0Vex8OPaIHKryc2NswnhekSA",
-    authDomain: "movie-comment-aaf52.firebaseapp.com",
-    projectId: "movie-comment-aaf52",
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  async function sendComment() {
-    const text = document.getElementById("commentText").value;
-    const time = parseFloat(document.getElementById("commentTime").value);
-    if (!text || isNaN(time)) {
-      alert("コメントと秒数を正しく入力してください");
-      return;
-    }
-    await addDoc(collection(db, "comments"), { text, time });
-    alert("送信しました！");
-    document.getElementById("commentText").value = "";
-    document.getElementById("commentTime").value = "";
+  function sendComment() {
+    const text = commentInput.value.trim();
+    if (!text) return;
+    const currentTime = Math.floor(video.currentTime); // 小数切捨て
+    comments.push({ time: currentTime, text });
+    commentInput.value = "";
   }
 
-  let comments = [];
-  let startTime = null;
-
-  async function startSync() {
-    comments = [];
-    const snap = await getDocs(collection(db, "comments"));
-    snap.forEach(doc => {
-      comments.push(doc.data());
+  // 動画に合わせてコメントを表示
+  video.addEventListener("timeupdate", () => {
+    const current = Math.floor(video.currentTime);
+    comments.forEach((comment, index) => {
+      if (!comment.shown && comment.time === current) {
+        showComment(comment.text);
+        comment.shown = true;
+      }
     });
-
-    startTime = Date.now();
-    setInterval(() => {
-      const elapsed = (Date.now() - startTime) / 1000;
-      comments.forEach((c, i) => {
-        if (elapsed >= c.time && !c._shown) {
-          c._shown = true;
-          showComment(c.text);
-        }
-      });
-    }, 500);
-  }
+  });
 
   function showComment(text) {
-    const container = document.getElementById("video-container");
     const div = document.createElement("div");
     div.className = "comment";
-    div.textContent = text;
+    div.innerText = text;
 
-    // ランダム位置（動画枠内）
-    const maxX = container.clientWidth - 150;
-    const maxY = container.clientHeight - 40;
-    div.style.left = Math.random() * maxX + "px";
-    div.style.top = Math.random() * maxY + "px";
+    // ランダム位置
+    const container = document.getElementById("video-container");
+    const maxW = container.offsetWidth - 200;
+    const maxH = container.offsetHeight - 40;
+    div.style.left = Math.floor(Math.random() * maxW) + "px";
+    div.style.top = Math.floor(Math.random() * maxH) + "px";
 
-    container.appendChild(div);
-    setTimeout(() => container.removeChild(div), 4000);
+    div.style.position = "absolute";
+    overlay.appendChild(div);
+    setTimeout(() => overlay.removeChild(div), 4000);
   }
 </script>
 
