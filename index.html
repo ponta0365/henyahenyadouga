@@ -1,38 +1,24 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
   <meta charset="UTF-8">
-  <title>🎬 限定動画ページ（擬似同期）</title>
+  <title>🎥 限定動画ページ（擬似同期）</title>
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-    }
-    iframe {
-      width: 800px;
-      height: 450px;
-      position: relative;
-      z-index: 1;
-    }
-    #overlay {
-      position: absolute;
-      top: 80px;
-      left: 0;
-      width: 800px;
-      height: 450px;
-      pointer-events: none;
-      z-index: 2;
-    }
+    body { font-family: sans-serif; margin: 0; padding: 20px; text-align: center; }
+    iframe { width: 800px; height: 450px; border: none; }
     .comment {
-      position: absolute;
+      position: fixed;
+      font-size: 50px;
+      font-weight: bold;
       color: white;
-      font-size: 20px;
       background: rgba(0, 0, 0, 0.6);
       padding: 4px 8px;
-      border-radius: 5px;
-      animation: fadeout 4s linear forwards;
+      border-radius: 10px;
+      animation: fadeOut 4s forwards;
+      pointer-events: none;
+      z-index: 9999;
     }
-    @keyframes fadeout {
+    @keyframes fadeOut {
       0% { opacity: 1; }
       100% { opacity: 0; }
     }
@@ -40,59 +26,70 @@
 </head>
 <body>
 
-<h2>🎬 限定動画ページ（擬似同期）</h2>
+<h2>🎥 限定動画ページ（擬似同期）</h2>
 
-<input type="text" id="commentInput" placeholder="コメントを入力">
-<select id="timingSelect">
-  <option value="3">3秒後</option>
-  <option value="5">5秒後</option>
-  <option value="10">10秒後</option>
-</select>
-<button onclick="addComment()">コメント送信</button>
+<div>
+  <input type="text" id="commentInput" placeholder="コメントを入力">
+  <button onclick="sendComment()">コメント送信</button>
+</div>
 
-<div style="position: relative; display: inline-block;">
+<div>
   <iframe id="videoFrame" src="https://drive.google.com/file/d/1QLOY-8MyvT7oadCQEJ2T--QBouHk9DNv/preview" allow="autoplay"></iframe>
-  <div id="overlay"></div>
 </div>
 
 <script>
-  const comments = []; // {text: "abc", time: 5}
-  let currentTime = 0;
+  const comments = []; // { text, time }
+  let startTime = null;
 
-  function addComment() {
-    const text = document.getElementById("commentInput").value;
-    const time = parseInt(document.getElementById("timingSelect").value);
-    if (text) {
-      comments.push({ text, time });
-      alert(`コメント「${text}」を${time}秒後に表示します`);
+  const iframe = document.getElementById("videoFrame");
+  iframe.addEventListener("load", () => {
+    iframe.contentWindow.document.body?.addEventListener("click", () => {
+      if (!startTime) {
+        startTime = Date.now();
+        runTimer();
+      }
+    });
+  });
+
+  function sendComment() {
+    const text = document.getElementById("commentInput").value.trim();
+    if (!text || startTime === null) {
+      alert("再生ボタンを押してからコメントしてください");
+      return;
     }
+    const now = Date.now();
+    const seconds = Math.floor((now - startTime) / 1000);
+    comments.push({ text, time: seconds });
+    document.getElementById("commentInput").value = "";
   }
 
-  function showComment(text) {
-    const overlay = document.getElementById("overlay");
-    const div = document.createElement("div");
-    div.className = "comment";
-    div.textContent = text;
-
-    // ランダムな位置（動画サイズ800x450）
-    div.style.top = Math.floor(Math.random() * 400) + "px";
-    div.style.left = Math.floor(Math.random() * 700) + "px";
-
-    overlay.appendChild(div);
-    setTimeout(() => overlay.removeChild(div), 4000);
-  }
-
-  // 再生タイミングでカウントスタート（擬似同期）
-  document.getElementById("videoFrame").addEventListener("load", () => {
+  function runTimer() {
     setInterval(() => {
-      currentTime++;
-      comments.forEach((c, i) => {
-        if (c.time === currentTime) {
+      const currentSec = Math.floor((Date.now() - startTime) / 1000);
+      comments.forEach(c => {
+        if (c.time === currentSec) {
           showComment(c.text);
         }
       });
     }, 1000);
-  });
+  }
+
+  function showComment(text) {
+    const comment = document.createElement("div");
+    comment.className = "comment";
+    comment.textContent = text;
+
+    // ランダムな画面位置（文字サイズ50px考慮）
+    const x = Math.floor(Math.random() * (window.innerWidth - 300));
+    const y = Math.floor(Math.random() * (window.innerHeight - 100));
+    comment.style.left = `${x}px`;
+    comment.style.top = `${y}px`;
+
+    document.body.appendChild(comment);
+    setTimeout(() => {
+      document.body.removeChild(comment);
+    }, 4000);
+  }
 </script>
 
 </body>
