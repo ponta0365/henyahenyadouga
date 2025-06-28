@@ -1,95 +1,103 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
   <title>🎥 限定動画ページ（擬似同期）</title>
   <style>
-    body { font-family: sans-serif; margin: 0; padding: 20px; text-align: center; }
-    iframe { width: 800px; height: 450px; border: none; }
-    .comment {
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      color: white;
+      font-family: sans-serif;
+    }
+    #controls {
       position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 999;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 10px;
+      border-radius: 5px;
+    }
+    #comment-area {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .comment {
+      position: absolute;
       font-size: 50px;
       font-weight: bold;
-      color: white;
-      background: rgba(0, 0, 0, 0.6);
-      padding: 4px 8px;
-      border-radius: 10px;
-      animation: fadeOut 4s forwards;
-      pointer-events: none;
-      z-index: 9999;
+      white-space: nowrap;
+      animation: fadeOut 4s ease forwards;
     }
     @keyframes fadeOut {
       0% { opacity: 1; }
+      80% { opacity: 1; }
       100% { opacity: 0; }
     }
   </style>
 </head>
 <body>
 
-<h2>🎥 限定動画ページ（擬似同期）</h2>
-
-<div>
-  <input type="text" id="commentInput" placeholder="コメントを入力">
-  <button onclick="sendComment()">コメント送信</button>
+<div id="controls">
+  <button id="startBtn">再生スタート</button><br><br>
+  コメント：<input type="text" id="commentText">
+  時間(秒)：<input type="number" id="commentTime" style="width: 60px;" min="0">
+  色：<input type="color" id="commentColor" value="#ffffff">
+  <button id="sendBtn">コメント送信</button>
 </div>
 
-<div>
-  <iframe id="videoFrame" src="https://drive.google.com/file/d/1QLOY-8MyvT7oadCQEJ2T--QBouHk9DNv/preview" allow="autoplay"></iframe>
-</div>
+<div id="comment-area"></div>
+
+<iframe id="videoFrame"
+  src="https://drive.google.com/file/d/1QLOY-8MyvT7oadCQEJ2T--QBouHk9DNv/preview"
+  width="100%" height="100%" frameborder="0" allowfullscreen>
+</iframe>
 
 <script>
-  const comments = []; // { text, time }
+  const comments = [];
   let startTime = null;
 
-  const iframe = document.getElementById("videoFrame");
-  iframe.addEventListener("load", () => {
-    iframe.contentWindow.document.body?.addEventListener("click", () => {
-      if (!startTime) {
-        startTime = Date.now();
-        runTimer();
-      }
-    });
+  document.getElementById("startBtn").addEventListener("click", () => {
+    startTime = Date.now();
   });
 
-  function sendComment() {
-    const text = document.getElementById("commentInput").value.trim();
-    if (!text || startTime === null) {
-      alert("再生ボタンを押してからコメントしてください");
-      return;
+  document.getElementById("sendBtn").addEventListener("click", () => {
+    const text = document.getElementById("commentText").value;
+    const time = parseFloat(document.getElementById("commentTime").value);
+    const color = document.getElementById("commentColor").value;
+    if (text && !isNaN(time)) {
+      comments.push({ text, time, color, shown: false });
     }
-    const now = Date.now();
-    const seconds = Math.floor((now - startTime) / 1000);
-    comments.push({ text, time: seconds });
-    document.getElementById("commentInput").value = "";
+  });
+
+  function showComment(c) {
+    const area = document.getElementById("comment-area");
+    const el = document.createElement("div");
+    el.className = "comment";
+    el.style.color = c.color;
+    el.style.top = Math.random() * 80 + "%";
+    el.style.left = Math.random() * 80 + "%";
+    el.innerText = c.text;
+    area.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
   }
 
-  function runTimer() {
-    setInterval(() => {
-      const currentSec = Math.floor((Date.now() - startTime) / 1000);
-      comments.forEach(c => {
-        if (c.time === currentSec) {
-          showComment(c.text);
-        }
-      });
-    }, 1000);
-  }
-
-  function showComment(text) {
-    const comment = document.createElement("div");
-    comment.className = "comment";
-    comment.textContent = text;
-
-    // ランダムな画面位置（文字サイズ50px考慮）
-    const x = Math.floor(Math.random() * (window.innerWidth - 300));
-    const y = Math.floor(Math.random() * (window.innerHeight - 100));
-    comment.style.left = `${x}px`;
-    comment.style.top = `${y}px`;
-
-    document.body.appendChild(comment);
-    setTimeout(() => {
-      document.body.removeChild(comment);
-    }, 4000);
-  }
+  setInterval(() => {
+    if (startTime === null) return;
+    const now = (Date.now() - startTime) / 1000;
+    comments.forEach(c => {
+      if (!c.shown && now >= c.time) {
+        showComment(c);
+        c.shown = true;
+      }
+    });
+  }, 200);
 </script>
 
 </body>
