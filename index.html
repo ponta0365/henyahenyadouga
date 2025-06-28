@@ -2,25 +2,28 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>🎥 限定動画ページ（擬似同期）</title>
+  <title>🎥 限定動画ページ（同期コメント）</title>
   <style>
     body {
-      margin: 0;
-      overflow: hidden;
-      background: #000;
-      color: white;
       font-family: sans-serif;
+      margin: 0;
+      background: black;
+      color: white;
+      overflow: hidden;
     }
-    #controls {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      z-index: 999;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 10px;
-      border-radius: 5px;
+    #video-container {
+      position: relative;
+      width: 100vw;
+      height: 56.25vw;
+      max-height: 100vh;
+      overflow: hidden;
     }
-    #comment-area {
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    #overlay {
       position: absolute;
       top: 0;
       left: 0;
@@ -32,72 +35,134 @@
       position: absolute;
       font-size: 50px;
       font-weight: bold;
+      opacity: 0;
+      animation: fadeInOut 4s ease forwards;
       white-space: nowrap;
-      animation: fadeOut 4s ease forwards;
     }
-    @keyframes fadeOut {
+    @keyframes fadeInOut {
       0% { opacity: 1; }
-      80% { opacity: 1; }
       100% { opacity: 0; }
+    }
+    #control-panel {
+      padding: 10px;
+      background: #222;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+    #control-panel input, #control-panel button {
+      font-size: 16px;
     }
   </style>
 </head>
 <body>
 
-<div id="controls">
-  <button id="startBtn">再生スタート</button><br><br>
-  コメント：<input type="text" id="commentText">
-  時間(秒)：<input type="number" id="commentTime" style="width: 60px;" min="0">
-  色：<input type="color" id="commentColor" value="#ffffff">
-  <button id="sendBtn">コメント送信</button>
+<div id="video-container">
+  <iframe id="videoFrame" src="https://drive.google.com/file/d/1QLOY-8MyvT7oadCQEJ2T--QBouHk9DNv/preview?autoplay=0" allowfullscreen></iframe>
+  <div id="overlay"></div>
 </div>
 
-<div id="comment-area"></div>
+<div id="control-panel">
+  コメント：
+  <input type="text" id="commentInput" placeholder="コメント">
+  時間（秒）：
+  <input type="number" id="timeInput" value="5" style="width:60px">
+  色：
+  <input type="color" id="colorInput" value="#ff00aa">
+  <button onclick="sendComment()">コメント送信</button>
+</div>
 
-<iframe id="videoFrame"
-  src="https://drive.google.com/file/d/1QLOY-8MyvT7oadCQEJ2T--QBouHk9DNv/preview"
-  width="100%" height="100%" frameborder="0" allowfullscreen>
-</iframe>
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyC0J5x7akK0Vex8OPaIHKryc2NswnhekSA",
+    authDomain: "movie-comment-aaf52.firebaseapp.com",
+    databaseURL: "https://movie-comment-aaf52-default-rtdb.firebaseio.com",
+    projectId: "movie-comment-aaf52",
+    storageBucket: "movie-comment-aaf52.firebasestorage.app",
+    messagingSenderId: "368444743168",
+    appId: "1:368444743168:web:2641b37c79a7f7683202e5",
+    measurementId: "G-3VCG0P27TG"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const overlay = document.getElementById("overlay");
+  const commentInput = document.getElementById("commentInput");
+  const timeInput = document.getElementById("timeInput");
+  const colorInput = document.getElementById("colorInput");
+
   const comments = [];
-  let startTime = null;
+  let localTimer = 0;
+  let playing = false;
 
-  document.getElementById("startBtn").addEventListener("click", () => {
-    startTime = Date.now();
-  });
-
-  document.getElementById("sendBtn").addEventListener("click", () => {
-    const text = document.getElementById("commentText").value;
-    const time = parseFloat(document.getElementById("commentTime").value);
-    const color = document.getElementById("commentColor").value;
-    if (text && !isNaN(time)) {
-      comments.push({ text, time, color, shown: false });
-    }
-  });
-
-  function showComment(c) {
-    const area = document.getElementById("comment-area");
-    const el = document.createElement("div");
-    el.className = "comment";
-    el.style.color = c.color;
-    el.style.top = Math.random() * 80 + "%";
-    el.style.left = Math.random() * 80 + "%";
-    el.innerText = c.text;
-    area.appendChild(el);
-    setTimeout(() => el.remove(), 4000);
+  function startFakeTimer() {
+    if (playing) return;
+    playing = true;
+    const interval = setInterval(() => {
+      if (!playing) {
+        clearInterval(interval);
+        return;
+      }
+      localTimer++;
+      comments.forEach(comment => {
+        if (!comment.shown && comment.time === localTimer) {
+          showComment(comment.text, comment.color);
+          comment.shown = true;
+        }
+      });
+    }, 1000);
   }
 
-  setInterval(() => {
-    if (startTime === null) return;
-    const now = (Date.now() - startTime) / 1000;
-    comments.forEach(c => {
-      if (!c.shown && now >= c.time) {
-        showComment(c);
-        c.shown = true;
-      }
+  window.sendComment = async function () {
+    const text = commentInput.value.trim();
+    const time = parseInt(timeInput.value);
+    const color = colorInput.value;
+    if (!text || isNaN(time)) return;
+
+    await addDoc(collection(db, "comments"), {
+      text,
+      time,
+      color,
+      timestamp: new Date()
     });
-  }, 200);
+
+    commentInput.value = "";
+  }
+
+  function showComment(text, color) {
+    const div = document.createElement("div");
+    div.className = "comment";
+    div.innerText = text;
+    div.style.color = color;
+
+    const container = document.getElementById("video-container");
+    const maxW = container.offsetWidth - 300;
+    const maxH = container.offsetHeight - 80;
+    div.style.left = Math.floor(Math.random() * maxW) + "px";
+    div.style.top = Math.floor(Math.random() * maxH) + "px";
+
+    overlay.appendChild(div);
+    setTimeout(() => overlay.removeChild(div), 4000);
+  }
+
+  const q = query(collection(db, "comments"), orderBy("time"));
+  const querySnapshot = await getDocs(q);
+  querySnapshot.forEach(doc => {
+    const data = doc.data();
+    comments.push({ time: data.time, text: data.text, color: data.color });
+  });
+
+  document.getElementById("videoFrame").addEventListener("load", () => {
+    document.getElementById("videoFrame").contentWindow.document.body.addEventListener("click", () => {
+      startFakeTimer();
+    });
+  });
 </script>
 
 </body>
