@@ -4,17 +4,21 @@
   import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyC0J5x7akK0Vex8OPaIHKryc2NswnhekSA",
+    authDomain: "movie-comment-aaf52.firebaseapp.com",
+    databaseURL: "https://movie-comment-aaf52-default-rtdb.firebaseio.com",
+    projectId: "movie-comment-aaf52",
+    storageBucket: "movie-comment-aaf52.firebasestorage.app",
+    messagingSenderId: "368444743168",
+    appId: "1:368444743168:web:2641b37c79a7f7683202e5",
+    measurementId: "G-3VCG0P27TG"
   };
 
+  // 初期化
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
+  // コメントの読み込み
   async function loadComments() {
     const querySnapshot = await getDocs(collection(db, "comments"));
     querySnapshot.forEach((doc) => {
