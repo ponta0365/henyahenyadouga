@@ -14,7 +14,7 @@
     #video-container {
       position: relative;
       width: 70vw;
-      height: 39.375vw; /* 70% × 16:9比率 */
+      height: 39.375vw;
       max-height: 100vh;
       overflow: hidden;
       margin: auto;
@@ -155,12 +155,12 @@
   const querySnapshot = await getDocs(q);
   querySnapshot.forEach(doc => {
     const data = doc.data();
-    comments.push({ time: data.time, text: data.text, color: data.color });
+    comments.push({ time: data.time, text: data.text, color: data.color, shown: false });
   });
 
   document.getElementById("videoFrame").addEventListener("load", () => {
-    const iframeDoc = document.getElementById("videoFrame").contentWindow.document;
-    iframeDoc.body.addEventListener("click", () => {
+    const iframeWin = document.getElementById("videoFrame").contentWindow;
+    iframeWin.document.body.addEventListener("click", () => {
       startFakeTimer();
     });
   });
