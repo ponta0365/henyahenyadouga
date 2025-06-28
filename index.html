@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>限定動画視聴ページ</title>
+  <title>限定動画ページ＋コメント機能</title>
   <style>
     body {
       font-family: sans-serif;
@@ -10,72 +10,27 @@
       margin-top: 50px;
     }
     #login, #viewer { display: none; }
-    input[type="password"], input[type="text"] {
+    input, textarea {
       padding: 8px;
       font-size: 1em;
+      margin: 5px;
     }
     button {
       padding: 8px 16px;
       font-size: 1em;
-      margin-left: 8px;
     }
-    #comments { margin-top: 40px; text-align: left; max-width: 600px; margin-left: auto; margin-right: auto; }
-    #comments p { border-bottom: 1px solid #ccc; padding: 5px 0; }
+    #commentList {
+      margin-top: 20px;
+      text-align: left;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .comment-box {
+      border-bottom: 1px solid #ccc;
+      padding: 5px 0;
+    }
   </style>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyC0J5x7akK0Vex8OPaIHKryc2NswnhekSA",
-      authDomain: "movie-comment-aaf52.firebaseapp.com",
-      projectId: "movie-comment-aaf52",
-      storageBucket: "movie-comment-aaf52.appspot.com",
-      messagingSenderId: "368444743168",
-      appId: "1:368444743168:web:2641b37c79a7f7683202e5"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-
-    let username = "匿名ユーザー";
-
-    async function loadComments() {
-      const querySnapshot = await getDocs(collection(db, "comments"));
-      const commentList = document.getElementById("commentList");
-      commentList.innerHTML = "";
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        const p = document.createElement("p");
-        p.textContent = `${data.username || "匿名"}: ${data.comment}`;
-        commentList.appendChild(p);
-      });
-    }
-
-    async function submitComment() {
-      const commentText = document.getElementById("commentInput").value;
-      if (!commentText) return;
-      await addDoc(collection(db, "comments"), {
-        username: username,
-        comment: commentText,
-        timestamp: serverTimestamp()
-      });
-      document.getElementById("commentInput").value = "";
-      loadComments();
-    }
-
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        username = "user_" + user.uid.substring(0, 6);
-        loadComments();
-      }
-    });
-    signInAnonymously(auth);
-
-    window.submitComment = submitComment;
-  </script>
 </head>
 <body>
 
@@ -97,27 +52,84 @@
     </a>
   </p>
 
-  <div id="comments">
-    <h3>コメント一覧</h3>
-    <div id="commentList"></div>
-    <input type="text" id="commentInput" placeholder="コメントを入力">
-    <button onclick="submitComment()">送信</button>
+  <h3>💬 コメントを投稿する</h3>
+  <form id="commentForm">
+    <input type="text" id="username" placeholder="名前" required>
+    <br>
+    <textarea id="comment" placeholder="コメントを入力..." rows="3" cols="40" required></textarea>
+    <br>
+    <button type="submit">コメント送信</button>
+  </form>
+
+  <div id="commentList">
+    <h4>📃 コメント一覧</h4>
   </div>
 </div>
 
-<script>
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC0J5x7akK0Vex8OPaIHKryc2NswnhekSA",
+    authDomain: "movie-comment-aaf52.firebaseapp.com",
+    projectId: "movie-comment-aaf52",
+    storageBucket: "movie-comment-aaf52.appspot.com",
+    messagingSenderId: "368444743168",
+    appId: "1:368444743168:web:2641b37c79a7f7683202e5",
+    measurementId: "G-3VCG0P27TG"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // ログイン処理
   const correctPassword = "twitchfan";
   document.getElementById("login").style.display = "block";
 
-  function checkPassword() {
+  window.checkPassword = function () {
     const input = document.getElementById("password").value;
     if (input === correctPassword) {
       document.getElementById("login").style.display = "none";
       document.getElementById("viewer").style.display = "block";
+      loadComments();
     } else {
       alert("パスワードが違います。Discordで確認してください。");
     }
+  };
+
+  // コメント読み込み
+  async function loadComments() {
+    const q = query(collection(db, "comments"), orderBy("timestamp", "desc"));
+    const querySnapshot = await getDocs(q);
+    const commentList = document.getElementById("commentList");
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      const div = document.createElement("div");
+      div.className = "comment-box";
+      const time = data.timestamp?.toDate().toLocaleString() || "";
+      div.innerHTML = `<strong>${data.username}</strong> (${time})<br>${data.comment}`;
+      commentList.appendChild(div);
+    });
   }
+
+  // コメント送信
+  document.getElementById("commentForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const username = document.getElementById("username").value;
+    const comment = document.getElementById("comment").value;
+
+    await addDoc(collection(db, "comments"), {
+      username,
+      comment,
+      timestamp: serverTimestamp()
+    });
+
+    alert("コメントを投稿しました！");
+    location.reload(); // 再読み込みで表示更新
+  });
 </script>
 
 </body>
