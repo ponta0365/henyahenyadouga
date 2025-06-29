@@ -72,6 +72,7 @@
   色：
   <input type="color" id="colorInput" value="#ff00aa">
   <button onclick="sendComment()">コメント送信</button>
+  <button onclick="startFakeTimer()">再生と同期コメント開始</button>
 </div>
 
 <script type="module">
@@ -156,13 +157,6 @@
   querySnapshot.forEach(doc => {
     const data = doc.data();
     comments.push({ time: data.time, text: data.text, color: data.color, shown: false });
-  });
-
-  document.getElementById("videoFrame").addEventListener("load", () => {
-    const iframeWin = document.getElementById("videoFrame").contentWindow;
-    iframeWin.document.body.addEventListener("click", () => {
-      startFakeTimer();
-    });
   });
 </script>
 
